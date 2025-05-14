@@ -1,0 +1,114 @@
+#!/bin/bash
+
+CONFIG_DIR="$HOME/.config/command-launcher"
+DEFAULT_ID="default"
+USE_SUDO=false
+SET_CMD=""
+CMD_ID="$DEFAULT_ID"
+
+# Ensure config directory exists
+mkdir -p "$CONFIG_DIR"
+
+# Save command under a given ID
+set_command() {
+    local id="$1"
+    local command="$2"
+    echo "$command" > "$CONFIG_DIR/$id"
+    echo "Saved command under ID '$id': $command"
+    exit 0
+}
+
+# Get command by ID or fallback
+get_command() {
+    local id="$1"
+    if [[ -f "$CONFIG_DIR/$id" ]]; then
+        cat "$CONFIG_DIR/$id"
+    else
+        echo "echo \"Command Launcher\""
+    fi
+}
+
+# Help message
+print_help() {
+    cat <<EOF
+Usage: command-launcher [OPTIONS]
+
+A launcher script to save and run multiple custom commands by ID.
+
+Options:
+  -sc, --set-command "<cmd>"     Set and save the command to run
+  -id, --identifier "<id>"       Set the ID name/number to save or load command (default: 'default')
+  -c,  --command "<id>"          Run a saved command by ID
+  -r,  --remove "<id>"           Remove a saved command by ID
+  -su, --superuser               Run the command with sudo
+  -h,  --help                    Show this help message
+
+Examples:
+  command-launcher
+  command-launcher -sc "echo Hello" -id greet
+  command-launcher -c greet
+  command-launcher -c greet -su
+  command-launcher -r greet
+EOF
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -sc|--set-command)
+            shift
+            [[ -z "$1" ]] && echo "Error: Missing command after $1" && exit 1
+            SET_CMD="$1"
+            ;;
+        -id|--identifier)
+            shift
+            [[ -z "$1" ]] && echo "Error: Missing ID after $1" && exit 1
+            CMD_ID="$1"
+            ;;
+        -c|--command)
+            shift
+            [[ -z "$1" ]] && echo "Error: Missing ID after $1" && exit 1
+            CMD_ID="$1"
+            ;;
+        -r|--remove)
+            shift
+            [[ -z "$1" ]] && echo "Error: Missing ID after $1" && exit 1
+            if [[ -f "$CONFIG_DIR/$1" ]]; then
+                rm "$CONFIG_DIR/$1"
+                echo "Removed command ID: $1"
+                exit 0
+            else
+                echo "No command found with ID: $1"
+                exit 1
+            fi
+            ;;
+        -su|--superuser)
+            USE_SUDO=true
+            ;;
+        -h|--help)
+            print_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            print_help
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# Save the command if provided
+if [[ -n "$SET_CMD" ]]; then
+    set_command "$CMD_ID" "$SET_CMD"
+fi
+
+# Run the command
+CMD=$(get_command "$CMD_ID")
+
+if $USE_SUDO; then
+    sudo bash -c "$CMD"
+else
+    bash -c "$CMD"
+fi
+
